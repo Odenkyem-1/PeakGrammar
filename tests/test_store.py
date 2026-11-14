@@ -5,8 +5,14 @@ import sys
 import tempfile
 import unittest
 
-# Ensure project root is in sys.path when running script directly
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Ensure project root and venv site-packages are in sys.path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+VENV_SITE = os.path.join(PROJECT_ROOT, "venv", "Lib", "site-packages")
+if os.path.exists(VENV_SITE) and VENV_SITE not in sys.path:
+    sys.path.insert(0, VENV_SITE)
 
 from store.database import (
     init_db, get_setting, set_setting, get_all_settings,
