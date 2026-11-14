@@ -1,8 +1,12 @@
 """Unit tests for PeakGrammar store modules."""
 
 import os
+import sys
 import tempfile
 import unittest
+
+# Ensure project root is in sys.path when running script directly
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from store.database import (
     init_db, get_setting, set_setting, get_all_settings,
