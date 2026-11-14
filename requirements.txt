@@ -1,4 +1,4 @@
-pyside6>=6.9
+PySide6-Essentials>=6.9
 harper-py>=0.1.1
 pywinauto>=0.6.9
 pynput>=1.8
