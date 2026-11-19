@@ -1,9 +1,11 @@
 """Floating suggestion overlay card for PeakGrammar.
 
 A lightweight, frameless, always-on-top card that renders near the active
-caret position without stealing application focus.
+caret position without stealing application focus, with clear problem text
+highlighting and multi-monitor screen boundary clamping.
 """
 
+import html
 from typing import Any, Callable, Optional
 from PySide6.QtCore import Qt, QPoint, QRect
 from PySide6.QtGui import QFont, QColor
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QGraphicsDropShadowEffect,
     QApplication,
+    QFrame,
 )
 
 
@@ -45,21 +48,21 @@ class SuggestionOverlay(QWidget):
 
     def _setup_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(12, 12, 12, 12)
+        outer_layout.setContentsMargins(10, 10, 10, 10)
 
         # Inner card container
-        self.card = QWidget(self)
+        self.card = QFrame(self)
         self.card.setObjectName("suggestionCard")
 
         # Soft monochrome shadow effect
         shadow = QGraphicsDropShadowEffect(self.card)
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 45))
+        shadow.setBlurRadius(24)
+        shadow.setColor(QColor(0, 0, 0, 50))
         shadow.setOffset(0, 4)
         self.card.setGraphicsEffect(shadow)
 
         card_layout = QVBoxLayout(self.card)
-        card_layout.setContentsMargins(14, 12, 14, 12)
+        card_layout.setContentsMargins(16, 14, 16, 14)
         card_layout.setSpacing(10)
 
         # Top row: Category Badge & Dismiss
@@ -67,6 +70,12 @@ class SuggestionOverlay(QWidget):
         self.badge = QLabel("Grammar", self.card)
         self.badge.setObjectName("badgeGrammar")
         top_row.addWidget(self.badge)
+
+        self.msg_label = QLabel(self.card)
+        self.msg_label.setFont(QFont("Segoe UI", 10))
+        self.msg_label.setStyleSheet("color: #71717a; margin-left: 6px;")
+        top_row.addWidget(self.msg_label)
+
         top_row.addStretch()
 
         self.close_btn = QPushButton("×", self.card)
@@ -76,18 +85,26 @@ class SuggestionOverlay(QWidget):
         top_row.addWidget(self.close_btn)
         card_layout.addLayout(top_row)
 
-        # Message / Problem preview
-        self.msg_label = QLabel(self.card)
-        self.msg_label.setWordWrap(True)
-        self.msg_label.setFont(QFont("Segoe UI", 10))
-        self.msg_label.setStyleSheet("color: #71717a;")
-        card_layout.addWidget(self.msg_label)
+        # Context snippet preview with highlighted problem text
+        self.snippet_container = QFrame(self.card)
+        self.snippet_container.setObjectName("cardSecondary")
+        snippet_layout = QVBoxLayout(self.snippet_container)
+        snippet_layout.setContentsMargins(10, 8, 10, 8)
+        snippet_layout.setSpacing(4)
 
-        # Main suggestion text
+        self.context_label = QLabel(self.snippet_container)
+        self.context_label.setWordWrap(True)
+        self.context_label.setFont(QFont("Segoe UI", 11))
+        self.context_label.setTextFormat(Qt.TextFormat.RichText)
+        snippet_layout.addWidget(self.context_label)
+
+        card_layout.addWidget(self.snippet_container)
+
+        # Main suggestion replacement label
         self.suggestion_label = QLabel(self.card)
         self.suggestion_label.setWordWrap(True)
-        self.suggestion_label.setFont(QFont("Segoe UI", 12, QFont.Weight.DemiBold))
-        self.suggestion_label.setStyleSheet("color: #18181b;")
+        self.suggestion_label.setFont(QFont("Segoe UI", 11))
+        self.suggestion_label.setTextFormat(Qt.TextFormat.RichText)
         card_layout.addWidget(self.suggestion_label)
 
         # Action Buttons Row
@@ -123,8 +140,10 @@ class SuggestionOverlay(QWidget):
         on_dict: Callable[[], None],
         on_rewrite: Optional[Callable[[], None]] = None,
         anchor_pos: Optional[QPoint] = None,
+        bounding_rect: Optional[tuple[int, int, int, int]] = None,
+        original_text: Optional[str] = None,
     ) -> None:
-        """Populate and display the suggestion card near the active caret anchor."""
+        """Populate and display the suggestion card with issue highlighting and strict screen clamping."""
         self._current_apply_cb = on_apply
         self._current_ignore_cb = on_ignore
         self._current_dict_cb = on_dict
@@ -135,7 +154,7 @@ class SuggestionOverlay(QWidget):
         suggestions = lint.get("suggestions", [])
         is_llm = lint.get("type") == "rewrite"
 
-        # Update Badge
+        # 1. Update Category Badge
         if is_llm:
             self.badge.setText("LLM Rewrite")
             self.badge.setObjectName("badgeLLM")
@@ -145,18 +164,51 @@ class SuggestionOverlay(QWidget):
         else:
             self.badge.setText("Grammar")
             self.badge.setObjectName("badgeGrammar")
+
         self.badge.style().unpolish(self.badge)
         self.badge.style().polish(self.badge)
 
         self.msg_label.setText(message)
 
+        # 2. Render Context Snippet with the Problem Word Highlighted
+        text_source = original_text or problem
+        span = lint.get("span", (0, len(text_source)))
+        start, end = span
+
+        if text_source and 0 <= start <= end <= len(text_source) and problem:
+            # Extract surrounding window for readability
+            window_start = max(0, start - 25)
+            window_end = min(len(text_source), end + 25)
+            prefix = "…" if window_start > 0 else ""
+            suffix = "…" if window_end < len(text_source) else ""
+
+            before_str = html.escape(text_source[window_start:start])
+            problem_str = html.escape(text_source[start:end] or problem)
+            after_str = html.escape(text_source[end:window_end])
+
+            # Highlighted problem tag: monochrome black chip with white bold text & underline
+            highlighted_html = (
+                f'<span style="color: #71717a;">{prefix}{before_str}</span>'
+                f'<span style="background-color: #18181b; color: #ffffff; padding: 2px 7px; border-radius: 5px; font-weight: 700; text-decoration: underline;">{problem_str}</span>'
+                f'<span style="color: #71717a;">{after_str}{suffix}</span>'
+            )
+            self.context_label.setText(highlighted_html)
+            self.snippet_container.show()
+        else:
+            self.snippet_container.hide()
+
+        # 3. Render Suggestion and Primary Replace CTA
         if suggestions:
             first_sug = suggestions[0]
-            self.suggestion_label.setText(f"→ {first_sug}")
-            self.apply_btn.setText(f"Replace with \"{first_sug}\"")
+            esc_sug = html.escape(first_sug)
+            self.suggestion_label.setText(
+                f'<span style="color: #71717a; font-size: 11px;">Suggestion:</span> '
+                f'<b style="color: #18181b; font-size: 13px;">{esc_sug}</b>'
+            )
+            self.apply_btn.setText(f'Replace with "{first_sug}"')
             self.apply_btn.show()
         else:
-            self.suggestion_label.setText(problem)
+            self.suggestion_label.setText(f'<b style="color: #18181b;">{html.escape(problem)}</b>')
             self.apply_btn.hide()
 
         # Show/hide dictionary button (relevant for single words)
@@ -164,24 +216,54 @@ class SuggestionOverlay(QWidget):
         self.dict_btn.setVisible(is_single_word)
         self.rewrite_btn.setVisible(on_rewrite is not None)
 
+        # 4. Accurate Geometry Measurement and Strict Screen Boundary Clamping
+        self.card.adjustSize()
         self.adjustSize()
 
-        # Calculate bounded screen placement
-        if anchor_pos is not None:
-            screen = QApplication.primaryScreen()
-            if screen:
-                screen_geom = screen.availableGeometry()
-                card_w = self.width()
-                card_h = self.height()
+        hint = self.sizeHint()
+        card_w = max(hint.width(), self.width(), 360)
+        card_h = max(hint.height(), self.height(), 150)
+        self.resize(card_w, card_h)
 
-                target_x = max(screen_geom.left() + 10, min(anchor_pos.x(), screen_geom.right() - card_w - 10))
-                target_y = anchor_pos.y()
+        # Anchor position resolution
+        ref_point = anchor_pos or QPoint(200, 200)
+        screen = QApplication.screenAt(ref_point) or QApplication.primaryScreen()
 
-                # If it overflows screen bottom, display above the control
-                if target_y + card_h > screen_geom.bottom() - 10:
-                    target_y = max(screen_geom.top() + 10, target_y - card_h - 40)
+        if screen:
+            screen_geom = screen.availableGeometry()  # Excludes taskbars
 
-                self.move(target_x, target_y)
+            # Horizontal placement: align to anchor_pos.x(), clamped within screen with 16px margins
+            target_x = max(
+                screen_geom.left() + 16,
+                min(ref_point.x(), screen_geom.right() - card_w - 16)
+            )
+
+            # Vertical placement:
+            # If bounding_rect is provided: (left, top, right, bottom)
+            if bounding_rect and bounding_rect[3] > bounding_rect[1]:
+                ctrl_top = bounding_rect[1]
+                ctrl_bottom = bounding_rect[3]
+
+                # Check if placing below overflows the screen bottom
+                if ctrl_bottom + 8 + card_h > screen_geom.bottom() - 16:
+                    # Place ABOVE the control
+                    target_y = ctrl_top - card_h - 8
+                else:
+                    # Place BELOW the control
+                    target_y = ctrl_bottom + 8
+            else:
+                target_y = ref_point.y()
+                if target_y + card_h > screen_geom.bottom() - 16:
+                    target_y = target_y - card_h - 40
+
+            # Final safety clamp ensuring card is 100% inside screen bounds
+            target_y = max(
+                screen_geom.top() + 16,
+                min(target_y, screen_geom.bottom() - card_h - 16)
+            )
+
+            self.move(target_x, target_y)
+
         self.show()
 
     def _on_apply_clicked(self) -> None:

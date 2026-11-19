@@ -163,6 +163,8 @@ def on_check_field() -> None:
         on_dict=on_dict,
         on_rewrite=on_rewrite,
         anchor_pos=QPoint(x, y),
+        bounding_rect=context.bounding_rect,
+        original_text=text,
     )
 
 

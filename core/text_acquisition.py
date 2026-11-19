@@ -41,6 +41,8 @@ class FocusedContext(NamedTuple):
     process_name: str
     bounding_rect: tuple[int, int, int, int]  # (left, top, right, bottom)
     wrapper: Optional[UIAWrapper] = None
+    selected_text: Optional[str] = None
+    is_selection: bool = False
 
 
 def get_process_name(pid: int) -> str:
@@ -111,12 +113,33 @@ def get_focused_context() -> Optional[FocusedContext]:
 
         wrapper = UIAWrapper(info)
 
-        # 3. Read text: Attempt ValuePattern first, then TextPattern, then window_text
-        text: Optional[str] = None
+        # 3. Read text: Check for user-highlighted selection first, then ValuePattern, then TextPattern
+        selected_text: Optional[str] = None
+        selection_rect: Optional[tuple[int, int, int, int]] = None
+        is_selection = False
+
         try:
-            text = wrapper.iface_value.CurrentValue
+            doc_sel = wrapper.iface_text.GetSelection()
+            if doc_sel and len(doc_sel) > 0:
+                st = doc_sel[0].GetText(-1)
+                if st and st.strip():
+                    selected_text = st.strip()
+                    is_selection = True
+                    try:
+                        pts = doc_sel[0].GetBoundingRectangles()
+                        if pts and len(pts) >= 4:
+                            selection_rect = (int(pts[0]), int(pts[1]), int(pts[0] + pts[2]), int(pts[1] + pts[3]))
+                    except Exception:
+                        pass
         except Exception:
             pass
+
+        text: Optional[str] = selected_text
+        if text is None:
+            try:
+                text = wrapper.iface_value.CurrentValue
+            except Exception:
+                pass
 
         if text is None:
             try:
@@ -134,13 +157,16 @@ def get_focused_context() -> Optional[FocusedContext]:
         if text is None or not text.strip():
             return None
 
-        # 4. Get bounding rectangle
+        # 4. Get bounding rectangle (prefer exact selection coordinates if user highlighted text)
         rect_tuple = (0, 0, 0, 0)
-        try:
-            r = wrapper.rectangle()
-            rect_tuple = (r.left, r.top, r.right, r.bottom)
-        except Exception:
-            pass
+        if selection_rect is not None:
+            rect_tuple = selection_rect
+        else:
+            try:
+                r = wrapper.rectangle()
+                rect_tuple = (r.left, r.top, r.right, r.bottom)
+            except Exception:
+                pass
 
         # Retrieve top level window title if element title is empty
         display_name = app_title
@@ -159,6 +185,8 @@ def get_focused_context() -> Optional[FocusedContext]:
             process_name=proc_name,
             bounding_rect=rect_tuple,
             wrapper=wrapper,
+            selected_text=selected_text,
+            is_selection=is_selection,
         )
 
     except Exception:
