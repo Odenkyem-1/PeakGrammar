@@ -195,7 +195,7 @@ class SuggestionCard(QFrame):
         self.accept_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.accept_btn.setStyleSheet(
             "background-color: #9db0fc; color: #0d0f17; font-weight: 700; "
-            "border: none; border-radius: 6px; padding: 5px 16px; font-size: 12px;"
+            "border: none; border-radius: 14px; padding: 6px 18px; font-size: 12px;"
         )
         self.accept_btn.clicked.connect(lambda: self.accepted.emit(self.lint))
         btn_row.addWidget(self.accept_btn)
@@ -205,7 +205,7 @@ class SuggestionCard(QFrame):
         self.dismiss_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.dismiss_btn.setStyleSheet(
             "background-color: #232532; color: #c2c5d4; font-weight: 500; "
-            "border: 1px solid #2e3040; border-radius: 6px; padding: 5px 16px; font-size: 12px;"
+            "border: 1px solid #2e3040; border-radius: 14px; padding: 6px 18px; font-size: 12px;"
         )
         self.dismiss_btn.clicked.connect(lambda: self.dismissed.emit(self.lint))
         btn_row.addWidget(self.dismiss_btn)
@@ -287,19 +287,29 @@ class RefinementEditor(QWidget):
 
         top_bar.addStretch()
 
-        # Tone Selector Pills
+        # Tone Selector Pills (Segmented Capsule Control)
         tone_lbl = QLabel("Tone", top_bar_widget)
         tone_lbl.setStyleSheet("color: #75798c; font-size: 12px; margin-right: 2px;")
         top_bar.addWidget(tone_lbl)
 
+        tone_frame = QFrame(top_bar_widget)
+        tone_frame.setStyleSheet(
+            "background-color: #16171f; border: 1px solid #242632; border-radius: 16px; padding: 2px;"
+        )
+        tf_layout = QHBoxLayout(tone_frame)
+        tf_layout.setContentsMargins(2, 2, 2, 2)
+        tf_layout.setSpacing(2)
+
         self.tone_buttons: dict[str, QPushButton] = {}
         for tone_name in ("Academic", "Professional", "Casual"):
-            btn = QPushButton(tone_name, top_bar_widget)
-            btn.setObjectName("tonePillActive" if tone_name == self._active_tone else "tonePill")
+            btn = QPushButton(tone_name, tone_frame)
             btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             btn.clicked.connect(lambda checked=False, t=tone_name: self._set_tone(t))
             self.tone_buttons[tone_name] = btn
-            top_bar.addWidget(btn)
+            tf_layout.addWidget(btn)
+
+        self._set_tone(self._active_tone)
+        top_bar.addWidget(tone_frame)
 
         top_bar.addSpacing(8)
 
@@ -551,9 +561,16 @@ class RefinementEditor(QWidget):
     def _set_tone(self, tone: str) -> None:
         self._active_tone = tone
         for name, btn in self.tone_buttons.items():
-            btn.setObjectName("tonePillActive" if name == tone else "tonePill")
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
+            if name == tone:
+                btn.setStyleSheet(
+                    "background-color: #1b223d; color: #9db0fc; font-weight: 600; "
+                    "border: 1px solid #3c4b8e; border-radius: 13px; padding: 4px 14px; font-size: 12px;"
+                )
+            else:
+                btn.setStyleSheet(
+                    "background-color: transparent; color: #75798c; font-weight: 500; "
+                    "border: none; border-radius: 13px; padding: 4px 14px; font-size: 12px;"
+                )
 
     def _set_engine_mode(self, mode: str) -> None:
         self._active_engine = mode

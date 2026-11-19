@@ -4,7 +4,7 @@ Provides on-demand writing check hotkey (<ctrl>+<shift>+e), typing debounce
 triggers, and text expansion snippet processing.
 """
 
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 from pynput import keyboard
 
 
