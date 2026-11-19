@@ -65,9 +65,12 @@ class TestUI(unittest.TestCase):
 
     def test_editor_widget_initialization(self):
         editor = RefinementEditor()
-        self.assertEqual(editor.tone.count(), 5)
-        self.assertIn("Professional", [editor.tone.itemText(i) for i in range(5)])
-        self.assertEqual(editor.score_bar.maximum(), 100)
+        self.assertIn("Academic", editor.tone_buttons)
+        self.assertIn("Professional", editor.tone_buttons)
+        self.assertIn("Casual", editor.tone_buttons)
+        self.assertIsNotNone(editor.score_gauge)
+        self.assertEqual(editor.score_gauge.score, 100)
+        self.assertIsNotNone(editor.text_edit)
 
     def test_settings_dialog_initialization(self):
         temp_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)

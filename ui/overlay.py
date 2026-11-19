@@ -186,11 +186,18 @@ class SuggestionOverlay(QWidget):
             problem_str = html.escape(text_source[start:end] or problem)
             after_str = html.escape(text_source[end:window_end])
 
-            # Highlighted problem tag: monochrome black chip with white bold text & underline
+            # Highlighted problem tag: vibrant tinted chip with colored underline
+            msg_lower = message.lower()
+            is_clarity = "clarity" in msg_lower or "style" in msg_lower or "wordy" in msg_lower
+            if is_clarity:
+                chip_style = "background-color: #292015; color: #fbbf24; border: 1px solid #48351a;"
+            else:
+                chip_style = "background-color: #2b171c; color: #f87171; border: 1px solid #4a242c;"
+
             highlighted_html = (
-                f'<span style="color: #71717a;">{prefix}{before_str}</span>'
-                f'<span style="background-color: #18181b; color: #ffffff; padding: 2px 7px; border-radius: 5px; font-weight: 700; text-decoration: underline;">{problem_str}</span>'
-                f'<span style="color: #71717a;">{after_str}{suffix}</span>'
+                f'<span style="color: #8e92a4;">{prefix}{before_str}</span>'
+                f'<span style="{chip_style} padding: 2px 7px; border-radius: 5px; font-weight: 700; text-decoration: underline;">{problem_str}</span>'
+                f'<span style="color: #8e92a4;">{after_str}{suffix}</span>'
             )
             self.context_label.setText(highlighted_html)
             self.snippet_container.show()
@@ -202,8 +209,8 @@ class SuggestionOverlay(QWidget):
             first_sug = suggestions[0]
             esc_sug = html.escape(first_sug)
             self.suggestion_label.setText(
-                f'<span style="color: #71717a; font-size: 11px;">Suggestion:</span> '
-                f'<b style="color: #18181b; font-size: 13px;">{esc_sug}</b>'
+                f'<span style="color: #8e92a4; font-size: 11px;">Suggestion:</span> '
+                f'<b style="color: #9db0fc; font-size: 13px;">{esc_sug}</b>'
             )
             self.apply_btn.setText(f'Replace with "{first_sug}"')
             self.apply_btn.show()

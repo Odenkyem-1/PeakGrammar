@@ -134,16 +134,16 @@ class OnboardingDialog(QDialog):
     def _add_status_row(self, layout: QVBoxLayout, label: str, passed: bool) -> None:
         row = QHBoxLayout()
         dot = QLabel("●")
-        dot.setStyleSheet("color: #18181b;" if passed else "color: #71717a;")
+        dot.setStyleSheet("color: #10b981;" if passed else "color: #f87171;")
         dot.setFixedWidth(16)
         row.addWidget(dot)
 
         txt = QLabel(label)
-        txt.setStyleSheet("color: #18181b;" if passed else "color: #71717a;")
+        txt.setStyleSheet("color: #f0f1f6;" if passed else "color: #8e92a4;")
         row.addWidget(txt, stretch=1)
 
         status_txt = QLabel("Active" if passed else "Check Permissions")
-        status_txt.setStyleSheet("color: #18181b; font-weight: 600;" if passed else "color: #71717a;")
+        status_txt.setStyleSheet("color: #10b981; font-weight: 600;" if passed else "color: #f87171;")
         row.addWidget(status_txt)
 
         layout.addLayout(row)
