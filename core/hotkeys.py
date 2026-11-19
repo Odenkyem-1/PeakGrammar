@@ -40,10 +40,15 @@ class HotkeyManager:
 
 
 class KeyboardActivityListener:
-    """Listens for keystrokes to trigger the idle debouncer."""
+    """Listens for keystrokes to trigger the idle debouncer and notify typing activity."""
 
-    def __init__(self, on_activity: Callable[[], None]):
+    def __init__(
+        self,
+        on_activity: Callable[[], None],
+        on_keystroke: Optional[Callable[[Any], None]] = None,
+    ):
         self.on_activity = on_activity
+        self.on_keystroke = on_keystroke
         self._listener: Optional[keyboard.Listener] = None
 
     def start(self) -> None:
@@ -60,6 +65,12 @@ class KeyboardActivityListener:
             self.on_activity()
         except Exception:
             pass
+
+        if self.on_keystroke:
+            try:
+                self.on_keystroke(key)
+            except Exception:
+                pass
 
     def stop(self) -> None:
         if self._listener is not None:

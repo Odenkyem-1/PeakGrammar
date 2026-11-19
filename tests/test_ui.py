@@ -16,10 +16,10 @@ if os.path.exists(VENV_SITE):
     site.addsitedir(VENV_SITE)
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRect, QPoint
 
 from ui.editor import calculate_writing_score, RefinementEditor
-from ui.overlay import SuggestionOverlay
+from ui.overlay import SuggestionOverlay, calculate_overlay_geometry
 from ui.settings import SettingsDialog
 from ui.onboarding import OnboardingDialog
 from store.dictionary import DictionaryStore
@@ -62,6 +62,36 @@ class TestUI(unittest.TestCase):
         self.assertTrue(flags & Qt.WindowType.Tool)
         self.assertTrue(overlay.testAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating))
         self.assertTrue(overlay.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground))
+
+    def test_overlay_geometry_smart_placement(self):
+        screen_geom = QRect(0, 0, 1920, 1040)
+        card_size = (360, 140)
+
+        # 1. Normal input field in upper screen -> places cleanly below
+        ctrl_rect = (400, 100, 800, 140)
+        x, y = calculate_overlay_geometry(screen_geom, card_size, None, ctrl_rect)
+        self.assertGreaterEqual(y, 140)  # cleanly below input
+        self.assertEqual(x, 400)
+
+        # 2. Input field near bottom of screen -> places cleanly above
+        ctrl_bottom_rect = (400, 950, 800, 990)
+        x, y = calculate_overlay_geometry(screen_geom, card_size, None, ctrl_bottom_rect)
+        self.assertTrue(y < 950)  # above input
+        self.assertEqual(y, 950 - 140 - 8)
+
+        # 3. Chat sidebar on right edge -> docks to the left of the sidebar
+        sidebar_rect = (1400, 800, 1850, 920)
+        x, y = calculate_overlay_geometry(screen_geom, card_size, None, sidebar_rect)
+        self.assertTrue(x < 1400)  # to the left of sidebar
+        self.assertEqual(x, 1400 - 360 - 12)
+
+        # 4. Caret near edge -> never clips outside screen boundaries
+        edge_pos = QPoint(1910, 1030)
+        x, y = calculate_overlay_geometry(screen_geom, card_size, edge_pos, None)
+        self.assertLessEqual(x + card_size[0], screen_geom.right())
+        self.assertLessEqual(y + card_size[1], screen_geom.bottom())
+        self.assertGreaterEqual(x, screen_geom.left())
+        self.assertGreaterEqual(y, screen_geom.top())
 
     def test_editor_widget_initialization(self):
         editor = RefinementEditor()

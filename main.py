@@ -76,6 +76,8 @@ class ServiceBridge(QObject):
     """Bridges background thread triggers (hotkeys, debouncer) to the Qt GUI thread."""
     check_field_requested = Signal()
     open_editor_with_text = Signal(str)
+    dismiss_overlay_requested = Signal()
+    accept_suggestion_requested = Signal()
 
 
 bridge = ServiceBridge()
@@ -169,16 +171,32 @@ def on_check_field() -> None:
 
 
 bridge.check_field_requested.connect(on_check_field)
+bridge.dismiss_overlay_requested.connect(overlay.hide)
+bridge.accept_suggestion_requested.connect(overlay.apply_current_suggestion)
 
 
 # ---------------------------------------------------------------------------
-# 5. Background Listeners (Debounce + Hotkeys)
+# 5. Background Listeners (Debounce + Hotkeys + Typing Dismissal)
 # ---------------------------------------------------------------------------
 debounce_delay = int(get_setting("debounce_ms", "700"))
 debouncer = IdleDebouncer(callback=trigger_check, delay_ms=debounce_delay)
 
-# Keystroke listener resets idle debouncer
-activity_listener = KeyboardActivityListener(on_activity=debouncer.poke)
+
+def on_user_keystroke(key) -> None:
+    """Invoked on every background keystroke.
+
+    If the suggestion overlay is visible, any typing keystroke instantly dismisses
+    it so the user's active typing flow and sightline are never obstructed.
+    """
+    if overlay.isVisible():
+        bridge.dismiss_overlay_requested.emit()
+
+
+# Keystroke listener resets debouncer and dismisses floating card on typing
+activity_listener = KeyboardActivityListener(
+    on_activity=debouncer.poke,
+    on_keystroke=on_user_keystroke,
+)
 activity_listener.start()
 
 # Global hotkey (<ctrl>+<shift>+e) for on-demand check
